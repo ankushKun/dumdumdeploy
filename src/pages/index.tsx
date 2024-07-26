@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { WavyBackground } from "@/components/ui/wavy-background";
-import { ConnectButton, useConnection } from "arweave-wallet-kit";
+import { ConnectButton, useActiveAddress, useConnection } from "arweave-wallet-kit";
 import { useEffect } from "react";
 
 export default function Home() {
