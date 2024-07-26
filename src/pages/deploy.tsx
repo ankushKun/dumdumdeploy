@@ -1,7 +1,9 @@
+import Layout from "@/components/layout";
+
 export default function Deploy() {
     return (
-        <div>
-            <h1>Deploy</h1>
-        </div>
+        <Layout>
+            deploy new project
+        </Layout>
     );
 }
