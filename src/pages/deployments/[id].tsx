@@ -5,9 +5,9 @@ import { useRouter } from "next/router";
 export default function Deployment() {
     const globalState = useGlobalState();
     const router = useRouter();
-    const id = router.query.id;
+    const name = router.query.name;
 
-    const deployment = globalState.deployments.find((dep) => dep.ID.toString() == id);
+    const deployment = globalState.deployments.find((dep) => dep.Name == name);
 
     if (!deployment) return <Layout>
         <div className="text-xl">Deployment not found</div>
