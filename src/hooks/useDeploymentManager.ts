@@ -65,17 +65,18 @@ Handlers.add(
 
         console.log("fetching deployments")
 
-        connect().dryrun({
+        const result = await connect().dryrun({
             process: globalState.managerProcess,
             tags: [{ name: "Action", value: "DumDumDeploy.GetDeployments" }],
             Owner: address
-        }).then((result) => {
-            if (result.Error) return alert(result.Error)
-            const { Messages } = result
-            const deployments = JSON.parse(Messages[0].Data)
-            console.log("deployments", deployments)
-            globalState.setDeployments(deployments)
         })
+
+        if (result.Error) return alert(result.Error)
+        const { Messages } = result
+        const deployments = JSON.parse(Messages[0].Data)
+        console.log("deployments", deployments)
+        globalState.setDeployments(deployments)
+
     }
 
     return {

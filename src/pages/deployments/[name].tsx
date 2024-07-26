@@ -15,5 +15,6 @@ export default function Deployment() {
 
     return <Layout>
         <div className="text-xl">{deployment?.Name}</div>
+        <pre>{JSON.stringify(deployment, null, 4)}</pre>
     </Layout>
 }

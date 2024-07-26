@@ -8,18 +8,24 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { toast } from "sonner";
 import Arweave from "arweave"
+import { Loader } from "lucide-react";
+import useDeploymentManager from "@/hooks/useDeploymentManager";
 
 export default function Deploy() {
     const globalState = useGlobalState();
     const router = useRouter()
+    const { managerProcess, refresh } = useDeploymentManager()
     const [projName, setProjName] = useState("");
     const [repoUrl, setRepoUrl] = useState("");
     const [installCommand, setInstallCommand] = useState("npm ci");
-    const [buildCommand, setBuildCommand] = useState("");
-    const [outputDir, setOutputDir] = useState("");
+    const [buildCommand, setBuildCommand] = useState("npm run build");
+    const [outputDir, setOutputDir] = useState("./dist");
     const [useNewWallet, setUseNewWallet] = useState(false);
-    const [newWallet, setNewWallet] = useState<object>();
+    const [wallet, setWallet] = useState<object>();
     const [newWalletAddress, setNewWalletAddress] = useState<string>();
+    const [deploying, setDeploying] = useState(false);
+    const [arnsProcess, setArnsProcess] = useState("")
+
 
     const arweave = Arweave.init({
         host: "arweave.net",
@@ -33,21 +39,29 @@ export default function Deploy() {
         if (!installCommand) return toast.error("Install Command is required");
         if (!buildCommand) return toast.error("Build Command is required");
         if (!outputDir) return toast.error("Output Directory is required");
+        if (!arnsProcess) return toast.error("ArNS Process iD is required");
+        if (!wallet) return toast.error("Wallet is required");
+        if (!newWalletAddress) return toast.error("Wallet Address not found");
+
+        if (deploying) return;
+
 
         if (!globalState.managerProcess) return toast.error("Manager process not found");
 
+        setDeploying(true);
         const query = `local res = db:exec[[
-            INSERT INTO Deployments (Name, RepoUrl, InstallCMD, BuildCMD, OutputDIR, DeployWithWallet)
+            INSERT INTO Deployments (Name, RepoUrl, InstallCMD, BuildCMD, OutputDIR, ArnsProcess, DeployWithWallet)
                 VALUES
-            ('${projName}', '${repoUrl}', '${installCommand}', '${buildCommand}', '${outputDir}', ${newWalletAddress})
+            ('${projName}', '${repoUrl}', '${installCommand}', '${buildCommand}', '${outputDir}', '${arnsProcess}', '${newWalletAddress}')
         ]]`;
         console.log(query);
 
         const res = await runLua(query, globalState.managerProcess)
         if (res.Error) return toast.error(res.Error);
         console.log(res);
+        await refresh()
+        setDeploying(false);
         router.push("/deployments/" + projName);
-
     }
 
     return (
@@ -58,28 +72,31 @@ export default function Deploy() {
                 <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="project-name">Project Name</label>
                 <Input placeholder="e.g. Coolest AO App" id="project-name" required onChange={(e) => setProjName(e.target.value)} />
 
-                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="project-name">Repository Url</label>
+                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="repo-url">Repository Url</label>
                 <Input placeholder="e.g. github.com/weeblet/super-cool-app" id="repo-url" required onChange={(e) => setRepoUrl(e.target.value)} />
 
-                <label className="text-muted-foreground pl-2 pt-10 -mb-1" htmlFor="project-name">Install Command</label>
-                <Input placeholder="e.g. npm ci" id="install-command" required onChange={(e) => setInstallCommand(e.target.value || "npm ci")} />
+                <label className="text-muted-foreground pl-2 pt-10 -mb-1" htmlFor="install-command">Install Command</label>
+                <Input placeholder="e.g. npm ci" id="install-command" onChange={(e) => setInstallCommand(e.target.value || "npm ci")} />
 
-                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="project-name">Build Command</label>
-                <Input placeholder="e.g. npm run build" id="build-command" required onChange={(e) => setBuildCommand(e.target.value || "npm run build")} />
+                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="build-command">Build Command</label>
+                <Input placeholder="e.g. npm run build" id="build-command" onChange={(e) => setBuildCommand(e.target.value || "npm run build")} />
 
-                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="project-name">Output Directory</label>
-                <Input placeholder="e.g. ./dist" id="output-dir" required onChange={(e) => setOutputDir(e.target.value || "./dist")} />
+                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="output-dir">Output Directory</label>
+                <Input placeholder="e.g. ./dist" id="output-dir" onChange={(e) => setOutputDir(e.target.value || "./dist")} />
 
-                <div className="flex items-center space-x-3 my-4">
+                <label className="text-muted-foreground pl-2 pt-10 -mb-1" htmlFor="arns-process">ArNS Process ID (get this from arns.app)</label>
+                <Input placeholder="e.g. ./dist" id="arns-process" onChange={(e) => setArnsProcess(e.target.value)} />
+
+                <div className="flex items-center space-x-3 my-4 pt-6">
                     <Switch id="gen-wallet" onCheckedChange={async (e) => {
                         setUseNewWallet(e)
                         if (!e) {
-                            setNewWallet(undefined)
+                            setWallet(undefined)
                             setNewWalletAddress(undefined)
                             return
                         }
                         const wallet = await arweave.wallets.generate();
-                        setNewWallet(wallet)
+                        setWallet(wallet)
                         setNewWalletAddress(await arweave.wallets.getAddress(wallet))
                     }} />
                     <label htmlFor="gen-wallet">Generate wallet</label>
@@ -93,7 +110,7 @@ export default function Deploy() {
                             reader.onload = async (e) => {
                                 const contents = e.target?.result;
                                 const wallet = JSON.parse(contents as string);
-                                setNewWallet(wallet)
+                                setWallet(wallet)
                                 setNewWalletAddress(await arweave.wallets.getAddress(wallet))
                             }
                             reader.readAsText(file);
@@ -102,8 +119,8 @@ export default function Deploy() {
                     </>
                 }
 
-                <Button className="my-10" onClick={deploy}>
-                    Deploy
+                <Button disabled={deploying} className="my-10" onClick={deploy}>
+                    Deploy <Loader className={deploying ? "animate-spin" : "hidden"} />
                 </Button>
 
             </div>

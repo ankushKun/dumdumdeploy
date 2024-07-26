@@ -56,7 +56,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
                 </SidebarBody>
             </Sidebar>
             <div className="flex flex-1">
-                <div className="p-2 md:p-10 rounded-t-2xl md:rounded-r-none md:rounded-l-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full min-h-screen">
+                <div className="p-2 md:p-10 rounded-t-2xl md:rounded-r-none md:rounded-l-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full max-h-screen overflow-scroll">
                     {connected ? children : "Connect Wallet to continue :)"}
                 </div></div>
         </div>

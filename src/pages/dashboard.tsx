@@ -37,6 +37,6 @@ export default function Dashboard() {
 
         {!managerProcess && <div className="text-xl"><Loader className="animate-spin m-5 mx-auto" /></div>}
         {managerProcess && deployments.length == 0 && <div className="text-muted-foreground mx-auto text-center">No deployments yet<br /><Link href="/deploy"><Button variant="link" className="text-muted-foreground p-0">Cilck here to create one</Button></Link></div>}
-        <HoverEffect items={deployments.map((dep: TDeployment) => { return { title: dep.Name, description: dep.RepoUrl, link: `/deployments/${dep.ID}` } })} />
+        <HoverEffect items={deployments.map((dep: TDeployment) => { return { title: dep.Name, description: dep.RepoUrl, link: `/deployments/${dep.Name}` } })} />
     </Layout>
 }
