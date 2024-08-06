@@ -23,9 +23,6 @@ export default function Deployment() {
 
     const deployment = globalState.deployments.find((dep) => dep.Name == name);
 
-    useEffect(() => {
-        refresh();
-    }, [])
 
     useEffect(() => {
         if (!deployment) return
