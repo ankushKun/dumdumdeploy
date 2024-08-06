@@ -5,6 +5,41 @@ import { getManagerProcessFromAddress } from "@/lib/utils";
 import { runLua, spawnProcess } from "@/lib/ao-vars";
 import { connect } from "@permaweb/aoconnect";
 
+const setupCommands = `json = require "json"
+
+if not db then
+    db = require"lsqlite3".open_memory()
+end
+
+db:exec[[
+    CREATE TABLE IF NOT EXISTS Deployments (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Name TEXT NOT NULL,
+        RepoUrl TEXT NOT NULL,
+        InstallCMD TEXT DEFAULT 'npm ci',
+        BuildCMD TEXT DEFAULT 'npm run build',
+        OutputDIR TEXT DEFAULT './dist',
+        ArnsProcess TEXT,
+        DeploymentId TEXT,
+        DeploymentHash TEXT
+    )
+]]
+
+Handlers.add(
+    "DumDumDeploy.GetDeployments",
+    Handlers.utils.hasMatchingTag("Action","DumDumDeploy.GetDeployments"),
+    function(msg)
+        local deployments = {}
+        for row in db:nrows[[SELECT * FROM Deployments]] do
+            table.insert(deployments, row)
+        end
+        Send({Target=msg.From, Data=json.encode(deployments)})
+    end
+)
+    
+return "OK"
+`
+
 export default function useDeploymentManager() {
     const globalState = useGlobalState();
     const { connected } = useConnection();
@@ -19,35 +54,7 @@ export default function useDeploymentManager() {
                 } else {
                     console.log("No manager process found, spawning new one");
                     spawnProcess("DumDumDeploy-Manager").then(async (newId) => {
-                        await runLua(`json = require "json"
-
-if not db then
-    db = require"lsqlite3".open_memory()
-end
-
-db:exec[[
-    CREATE TABLE IF NOT EXISTS Deployments (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Name TEXT NOT NULL,
-        RepoUrl TEXT NOT NULL,
-        InstallCMD TEXT DEFAULT 'npm ci',
-        BuildCMD TEXT DEFAULT 'npm run build',
-        OutputDIR TEXT DEFAULT './dist',
-        ArnsProcess TEXT
-    )
-]]
-
-Handlers.add(
-    "DumDumDeploy.GetDeployments",
-    Handlers.utils.hasMatchingTag("Action","DumDumDeploy.GetDeployments"),
-    function(msg)
-        local deployments = {}
-        for row in db:nrows[[SELECT * FROM Deployments]] do
-            table.insert(deployments, row)
-        end
-        Send({Target=msg.From, Data=json.encode(deployments)})
-    end
-)`, newId)
+                        await runLua(setupCommands, newId)
                         console.log("deployment manager id", newId);
                         globalState.setManagerProcess(newId);
                     });
@@ -71,11 +78,18 @@ Handlers.add(
             Owner: address
         })
 
-        if (result.Error) return alert(result.Error)
-        const { Messages } = result
-        const deployments = JSON.parse(Messages[0].Data)
-        console.log("deployments", deployments)
-        globalState.setDeployments(deployments)
+        try {
+            if (result.Error) return alert(result.Error)
+            console.log("result", result)
+            const { Messages } = result
+            const deployments = JSON.parse(Messages[0].Data)
+            console.log("deployments", deployments)
+            globalState.setDeployments(deployments)
+        }
+        catch {
+            await runLua(setupCommands, globalState.managerProcess)
+            await refresh()
+        }
 
     }
 
