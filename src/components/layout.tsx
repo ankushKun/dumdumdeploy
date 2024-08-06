@@ -11,6 +11,7 @@ import {
 import { Plus, User2, UserCircle2 } from "lucide-react";
 import Link from "next/link";
 import { ConnectButton, useConnection } from "arweave-wallet-kit";
+import Head from "next/head";
 
 const links = [
     {
