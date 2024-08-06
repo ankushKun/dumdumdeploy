@@ -39,7 +39,6 @@ export default function Deployment() {
             buildCommand,
             outputDir,
         })
-
         if (txid.status == 200) {
             console.log("https://arweave.net/" + txid.data)
             toast.success("Deployment successful")
