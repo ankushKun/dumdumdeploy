@@ -1,18 +1,16 @@
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useGlobalState } from "@/hooks";
 import { runLua } from "@/lib/ao-vars";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import Arweave from "arweave"
+import Arweave from "arweave";
 import { Loader } from "lucide-react";
 import useDeploymentManager from "@/hooks/useDeploymentManager";
-import axios from "axios"
-import Ansi from "ansi-to-react"
-import { connect, createDataItemSigner } from "@permaweb/aoconnect";
+import axios from "axios";
+import Ansi from "ansi-to-react";
 import { BUILDER_BACKEND } from "@/lib/utils";
 
 function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
@@ -21,39 +19,37 @@ function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
 
     useEffect(() => {
         if (!name) return
-        const internval = setInterval(async () => {
-            if (!deploying) return clearInterval(internval)
+        const interval = setInterval(async () => {
+            if (!deploying) return clearInterval(interval)
             const logs = await axios.get(`${BUILDER_BACKEND}/logs/${name}`)
             console.log(logs.data)
             setOutput((logs.data as string).replaceAll(/\\|\||\-/g, ""))
         }, 1000)
 
-        return () => { clearInterval(internval) }
+        return () => { clearInterval(interval) }
     }, [name, deploying])
 
-    return <div>
-        <div className="pl-2 mb-1">Build Logs</div>
-        <pre className="font-mono text-xs border p-2 rounded-lg px-4 bg-black/30 overflow-scroll max-h-[250px]">
-            <Ansi className="!font-mono">{output}</Ansi>
-        </pre>
-    </div>
+    return (
+        <div>
+            <div className="pl-2 mb-1">Build Logs</div>
+            <pre className="font-mono text-xs border p-2 rounded-lg px-4 bg-black/30 overflow-scroll max-h-[250px]">
+                <Ansi className="!font-mono">{output}</Ansi>
+            </pre>
+        </div>
+    )
 }
 
 export default function Deploy() {
     const globalState = useGlobalState();
-    const router = useRouter()
-    const { managerProcess, refresh } = useDeploymentManager()
+    const router = useRouter();
+    const { managerProcess, refresh } = useDeploymentManager();
     const [projName, setProjName] = useState("");
     const [repoUrl, setRepoUrl] = useState("");
     const [installCommand, setInstallCommand] = useState("npm ci");
     const [buildCommand, setBuildCommand] = useState("npm run build");
     const [outputDir, setOutputDir] = useState("./dist");
-    // const [useNewWallet, setUseNewWallet] = useState(false);
-    // const [wallet, setWallet] = useState<object>();
-    // const [newWalletAddress, setNewWalletAddress] = useState<string>();
     const [deploying, setDeploying] = useState(false);
-    const [arnsProcess, setArnsProcess] = useState("")
-
+    const [arnsProcess, setArnsProcess] = useState("");
 
     const arweave = Arweave.init({
         host: "arweave.net",
@@ -67,12 +63,9 @@ export default function Deploy() {
         if (!installCommand) return toast.error("Install Command is required");
         if (!buildCommand) return toast.error("Build Command is required");
         if (!outputDir) return toast.error("Output Directory is required");
-        if (!arnsProcess) return toast.error("ArNS Process iD is required");
-        // if (!wallet) return toast.error("Wallet is required");
-        // if (!newWalletAddress) return toast.error("Wallet Address not found");
+        if (!arnsProcess) return toast.error("ArNS Process ID is required");
 
         if (deploying) return;
-
 
         if (!globalState.managerProcess) return toast.error("Manager process not found");
 
@@ -84,55 +77,62 @@ export default function Deploy() {
         ]]`;
         console.log(query);
 
-        const res = await runLua(query, globalState.managerProcess)
+        const res = await runLua(query, globalState.managerProcess);
         if (res.Error) return toast.error(res.Error);
         console.log(res);
-        await refresh()
-
-        // call backend -> deploy -> get txid
+        await refresh();
 
         const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
             repository: repoUrl,
             installCommand,
             buildCommand,
             outputDir,
-        })
+        });
 
-        if (txid.status == 200) {
-            console.log("https://arweave.net/" + txid.data)
-            toast.success("Deployment successful")
-
-            // const mres = await connect().message({
-            //     process: arnsProcess,
-            //     tags: [
-            //         { name: "Action", value: "Set-Record" },
-            //         { name: "Sub-Domain", value: "@" },
-            //         { name: "Transaction-Id", value: txid.data },
-            //         { name: "TTL-Seconds", value: "3600" },
-            //     ],
-            //     signer: createDataItemSigner(window.arweaveWallet),
-            // })
+        if (txid.status === 200) {
+            console.log("https://arweave.net/" + txid.data);
+            toast.success("Deployment successful");
 
             const mres = await runLua("", arnsProcess, [
                 { name: "Action", value: "Set-Record" },
                 { name: "Sub-Domain", value: "@" },
                 { name: "Transaction-Id", value: txid.data },
                 { name: "TTL-Seconds", value: "3600" },
-            ])
-            console.log("set arns name", mres)
+            ]);
+            console.log("set arns name", mres);
 
-            const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess)
+            const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess);
 
             router.push("/deployments/" + projName);
-            window.open("https://arweave.net/" + txid.data, "_blank")
-
+            window.open("https://arweave.net/" + txid.data, "_blank");
 
         } else {
-            toast.error("Deployment failed")
-            console.log(txid)
+            toast.error("Deployment failed");
+            console.log(txid);
         }
 
         setDeploying(false);
+    }
+
+    async function deleteDeployment() {
+        if (!projName) return toast.error("Project Name is required");
+
+        if (!globalState.managerProcess) return toast.error("Manager process not found");
+
+        const query = `local res = db:exec[[
+            DELETE FROM Deployments
+            WHERE Name = '${projName}'
+        ]]`;
+        console.log(query);
+
+        const res = await runLua(query, globalState.managerProcess);
+        if (res.Error) return toast.error(res.Error);
+        console.log(res);
+        await refresh();
+
+        toast.success("Deployment deleted successfully");
+        router.push("/dashboard");
+
     }
 
     return (
@@ -158,40 +158,12 @@ export default function Deploy() {
                 <label className="text-muted-foreground pl-2 pt-10 -mb-1" htmlFor="arns-process">ArNS Process ID (get this from arns.app)</label>
                 <Input placeholder="e.g. ./dist" id="arns-process" onChange={(e) => setArnsProcess(e.target.value)} />
 
-                {/* <div className="flex items-center space-x-3 my-4 pt-6">
-                    <Switch id="gen-wallet" onCheckedChange={async (e) => {
-                        setUseNewWallet(e)
-                        if (!e) {
-                            setWallet(undefined)
-                            setNewWalletAddress(undefined)
-                            return
-                        }
-                        const wallet = await arweave.wallets.generate();
-                        setWallet(wallet)
-                        setNewWalletAddress(await arweave.wallets.getAddress(wallet))
-                    }} />
-                    <label htmlFor="gen-wallet">Generate wallet</label>
-                </div> */}
-                {/* {useNewWallet ? <>{newWalletAddress}</> :
-                    <>
-                        <Input type="file" accept=".json" id="wallet-file" required onChange={(e) => {
-                            if (e.target.files?.length == 0) return
-                            const file = e.target.files![0];
-                            const reader = new FileReader();
-                            reader.onload = async (e) => {
-                                const contents = e.target?.result;
-                                const wallet = JSON.parse(contents as string);
-                                setWallet(wallet)
-                                setNewWalletAddress(await arweave.wallets.getAddress(wallet))
-                            }
-                            reader.readAsText(file);
-                        }} />
-                        {newWalletAddress}
-                    </>
-                } */}
-
                 <Button disabled={deploying} className="my-10" onClick={deploy}>
                     Deploy <Loader className={deploying ? "animate-spin" : "hidden"} />
+                </Button>
+
+                <Button disabled={deploying} className="my-10" onClick={deleteDeployment}>
+                    Delete Deployment
                 </Button>
 
                 {
