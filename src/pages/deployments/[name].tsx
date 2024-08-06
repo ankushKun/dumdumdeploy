@@ -7,91 +7,120 @@ import { Github, LinkIcon, Loader } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import axios from "axios"
+import axios from "axios";
 import { BUILDER_BACKEND } from "@/lib/utils";
-import Ansi from "ansi-to-react"
+import Ansi from "ansi-to-react";
 import { connect } from "@permaweb/aoconnect";
 import { toast } from "sonner";
 import { runLua } from "@/lib/ao-vars";
 
-
 export default function Deployment() {
     const globalState = useGlobalState();
-    const { managerProcess, deployments, refresh } = useDeploymentManager()
+    const { managerProcess, deployments, refresh } = useDeploymentManager();
     const router = useRouter();
     const name = router.query.name;
-    const [buildOutput, setBuildOutput] = useState("")
-    const [antName, setAntName] = useState("")
-    const [redeploying, setRedeploying] = useState(false)
+    const [buildOutput, setBuildOutput] = useState("");
+    const [antName, setAntName] = useState("");
+    const [redeploying, setRedeploying] = useState(false);
+
     const deployment = globalState.deployments.find((dep) => dep.Name == name);
+
     const redeploy = async () => {
-        if (!deployment) return
-        const projName = deployment.Name
-        const repoUrl = deployment.RepoUrl
-        const installCommand = deployment.InstallCMD
-        const buildCommand = deployment.BuildCMD
-        const outputDir = deployment.OutputDIR
-        const arnsProcess = deployment.ArnsProcess
-        //send the deployment to the builder
-        const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
-            repository: repoUrl,
-            installCommand,
-            buildCommand,
-            outputDir,
-        })
-        if (txid.status == 200) {
-            console.log("https://arweave.net/" + txid.data)
-            toast.success("Deployment successful")
+        if (!deployment) return;
+        const projName = deployment.Name;
+        const repoUrl = deployment.RepoUrl;
+        const installCommand = deployment.InstallCMD;
+        const buildCommand = deployment.BuildCMD;
+        const outputDir = deployment.OutputDIR;
+        const arnsProcess = deployment.ArnsProcess;
 
-            const mres = await runLua("", arnsProcess, [
-                { name: "Action", value: "Set-Record" },
-                { name: "Sub-Domain", value: "@" },
-                { name: "Transaction-Id", value: txid.data },
-                { name: "TTL-Seconds", value: "3600" },
-            ])
-            console.log("set arns name", mres)
+        setRedeploying(true);
 
-            const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess)
-            console.log(updres)
-            router.push("/deployments/" + projName);
-            await refresh()
-            window.open("https://arweave.net/" + txid.data, "_blank")
+        try {
+            const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
+                repository: repoUrl,
+                installCommand,
+                buildCommand,
+                outputDir,
+            });
 
-            setRedeploying(false)
-        } else {
-            toast.error("Deployment failed")
-            console.log(txid)
+            if (txid.status == 200) {
+                toast.success("Deployment successful");
+
+                const mres = await runLua("", arnsProcess, [
+                    { name: "Action", value: "Set-Record" },
+                    { name: "Sub-Domain", value: "@" },
+                    { name: "Transaction-Id", value: txid.data },
+                    { name: "TTL-Seconds", value: "3600" },
+                ]);
+
+                const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess);
+
+                router.push("/deployments/" + projName);
+                await refresh();
+                window.open("https://arweave.net/" + txid.data, "_blank");
+
+                setRedeploying(false);
+            } else {
+                toast.error("Deployment failed");
+                console.log(txid);
+                setRedeploying(false);
+            }
+        } catch (error) {
+            toast.error("Deployment failed");
+            console.log(error);
+            setRedeploying(false);
         }
+    };
 
-    }
     useEffect(() => {
         refresh();
-    }, [])
+    }, []);
 
     useEffect(() => {
-        if (!deployment) return
-        const folderName = deployment?.RepoUrl.replace(/\.git|\/$/, '').split('/').pop() as string
+        if (!deployment) return;
+        const folderName = deployment?.RepoUrl.replace(/\.git|\/$/, '').split('/').pop() as string;
         axios.get(`${BUILDER_BACKEND}/logs/${folderName}`).then((res) => {
-            setBuildOutput((res.data as string).replaceAll(/\\|\||\-/g, ""))
-        })
+            setBuildOutput((res.data as string).replaceAll(/\\|\||\-/g, ""));
+        });
         connect().dryrun({
             process: deployment?.ArnsProcess,
             tags: [{ name: "Action", value: "Info" }]
         }).then(r => {
-            const d = JSON.parse(r.Messages[0].Data)
-            console.log(d)
-            setAntName(d.Name)
-        })
-    }, [deployment])
+            const d = JSON.parse(r.Messages[0].Data);
+            console.log(d);
+            setAntName(d.Name);
+        });
+    }, [deployment]);
+
+    async function deleteDeployment() {
+        if (!deployment) return toast.error("Deployment not found");
+
+        if (!globalState.managerProcess) return toast.error("Manager process not found");
+
+        const query = `local res = db:exec[[
+            DELETE FROM Deployments
+            WHERE Name = '${deployment.Name}'
+        ]]`;
+        console.log(query);
+
+        const res = await runLua(query, globalState.managerProcess);
+        if (res.Error) return toast.error(res.Error);
+        console.log(res);
+        await refresh();
+
+        toast.success("Deployment deleted successfully");
+        router.push("/dashboard");
+    }
 
     if (!deployment) return <Layout>
         <div className="text-xl">Searching <span className="text-muted-foreground">{name} </span> ...</div>
-    </Layout>
+    </Layout>;
 
     return <Layout>
         <div className="text-xl">{deployment?.Name}</div>
         <Button className="w-fit absolute right-10" onClick={redeploy}>
-            DeployLatestCommit <Loader className={redeploying ? "animate-spin" : "hidden"} />
+            Deploy Latest <Loader className={redeploying ? "animate-spin" : "hidden"} />
         </Button>
         <Link href={deployment.RepoUrl} target="_blank" className="w-fit flex items-center gap-1 my-2 hover:underline underline-offset-4"><Github size={24} />{deployment.RepoUrl}</Link>
         <Link href={`https://arweave.net/${deployment.DeploymentId}`} target="_blank" className="w-fit flex items-center gap-1 my-2 hover:underline underline-offset-4"><LinkIcon size={24} />DeploymentID : {deployment.DeploymentId || "..."}</Link>
@@ -111,9 +140,8 @@ export default function Deployment() {
                 <Card className=" h-fit p-0">
                     <div className="text-muted-foreground">Output Directory</div>
                     {deployment.OutputDIR}</Card>
-                <Button variant="destructive">Delete Deployment</Button>
+                <Button variant="destructive" onClick={deleteDeployment}>Delete Deployment</Button>
             </div>
         </div>
-
-    </Layout>
+    </Layout>;
 }
