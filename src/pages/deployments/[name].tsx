@@ -25,6 +25,24 @@ export default function Deployment() {
 
     const deployment = globalState.deployments.find((dep) => dep.Name == name);
 
+    useEffect(() => {
+        if (!deployment?.RepoUrl) return
+        const interval = setInterval(async () => {
+            const folderName = deployment?.RepoUrl.replace(/\.git|\/$/, '').split('/').pop() as string;
+            if (!redeploying) return clearInterval(interval)
+            const logs = await axios.get(`${BUILDER_BACKEND}/logs/${folderName}`)
+            console.log(logs.data)
+            setBuildOutput((logs.data as string).replaceAll(/\\|\||\-/g, ""))
+            //scroll logs to bottom
+            setTimeout(() => {
+                const logsDiv = document.getElementById("logs");
+                logsDiv?.scrollTo({ top: logsDiv.scrollHeight, behavior: "smooth" });
+            }, 100)
+        }, 1000)
+
+        return () => { clearInterval(interval) }
+    }, [redeploying, deployment?.RepoUrl])
+
     const redeploy = async () => {
         if (!deployment) return;
         const projName = deployment.Name;
@@ -35,7 +53,7 @@ export default function Deployment() {
         const arnsProcess = deployment.ArnsProcess;
 
         setRedeploying(true);
-
+        setBuildOutput("");
         try {
             const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
                 repository: repoUrl,
@@ -119,7 +137,7 @@ export default function Deployment() {
 
     return <Layout>
         <div className="text-xl">{deployment?.Name}</div>
-        <Button className="w-fit absolute right-10" onClick={redeploy}>
+        <Button className="w-fit absolute right-10" onClick={redeploy} disabled={redeploying}>
             Deploy Latest <Loader className={redeploying ? "animate-spin" : "hidden"} />
         </Button>
         <Link href={deployment.RepoUrl} target="_blank" className="w-fit flex items-center gap-1 my-2 hover:underline underline-offset-4"><Github size={24} />{deployment.RepoUrl}</Link>
@@ -128,7 +146,7 @@ export default function Deployment() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <Card>
                 <div className="text-muted-foreground mb-2">Build Output</div>
-                <pre className="overflow-scroll max-h-[350px] font-mono"><Ansi className="font-mono">{buildOutput}</Ansi></pre>
+                <pre className="overflow-scroll max-h-[350px] font-mono" id="logs"><Ansi className="font-mono">{buildOutput}</Ansi></pre>
             </Card>
             <div className="grid grid-cols-1 gap-2">
                 <Card className=" h-fit p-0">
@@ -140,7 +158,7 @@ export default function Deployment() {
                 <Card className=" h-fit p-0">
                     <div className="text-muted-foreground">Output Directory</div>
                     {deployment.OutputDIR}</Card>
-                <Button variant="destructive" onClick={deleteDeployment}>Delete Deployment</Button>
+                <Button variant="destructive" disabled={redeploying} onClick={deleteDeployment}>Delete Deployment</Button>
             </div>
         </div>
     </Layout>;

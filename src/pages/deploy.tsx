@@ -24,6 +24,10 @@ function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
             const logs = await axios.get(`${BUILDER_BACKEND}/logs/${name}`)
             console.log(logs.data)
             setOutput((logs.data as string).replaceAll(/\\|\||\-/g, ""))
+            setTimeout(() => {
+                const logsDiv = document.getElementById("logs");
+                logsDiv?.scrollTo({ top: logsDiv.scrollHeight, behavior: "smooth" });
+            }, 100)
         }, 1000)
 
         return () => { clearInterval(interval) }
@@ -32,7 +36,7 @@ function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
     return (
         <div>
             <div className="pl-2 mb-1">Build Logs</div>
-            <pre className="font-mono text-xs border p-2 rounded-lg px-4 bg-black/30 overflow-scroll max-h-[250px]">
+            <pre className="font-mono text-xs border p-2 rounded-lg px-4 bg-black/30 overflow-scroll max-h-[250px]" id="logs">
                 <Ansi className="!font-mono">{output}</Ansi>
             </pre>
         </div>
@@ -82,58 +86,63 @@ export default function Deploy() {
         console.log(res);
         await refresh();
 
-        const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
-            repository: repoUrl,
-            installCommand,
-            buildCommand,
-            outputDir,
-        });
+        try {
+            const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
+                repository: repoUrl,
+                installCommand,
+                buildCommand,
+                outputDir,
+            }, { timeout: 30 * 60 * 1000 });
 
-        if (txid.status === 200) {
-            console.log("https://arweave.net/" + txid.data);
-            toast.success("Deployment successful");
+            if (txid.status === 200) {
+                console.log("https://arweave.net/" + txid.data);
+                toast.success("Deployment successful");
 
-            const mres = await runLua("", arnsProcess, [
-                { name: "Action", value: "Set-Record" },
-                { name: "Sub-Domain", value: "@" },
-                { name: "Transaction-Id", value: txid.data },
-                { name: "TTL-Seconds", value: "3600" },
-            ]);
-            console.log("set arns name", mres);
+                const mres = await runLua("", arnsProcess, [
+                    { name: "Action", value: "Set-Record" },
+                    { name: "Sub-Domain", value: "@" },
+                    { name: "Transaction-Id", value: txid.data },
+                    { name: "TTL-Seconds", value: "3600" },
+                ]);
+                console.log("set arns name", mres);
 
-            const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess);
+                const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess);
 
-            router.push("/deployments/" + projName);
-            window.open("https://arweave.net/" + txid.data, "_blank");
+                router.push("/deployments/" + projName);
+                window.open("https://arweave.net/" + txid.data, "_blank");
 
-        } else {
+            } else {
+                toast.error("Deployment failed");
+                console.log(txid);
+            }
+        } catch (error) {
             toast.error("Deployment failed");
-            console.log(txid);
+            console.log(error);
         }
 
         setDeploying(false);
     }
 
-    async function deleteDeployment() {
-        if (!projName) return toast.error("Project Name is required");
+    // async function deleteDeployment() {
+    //     if (!projName) return toast.error("Project Name is required");
 
-        if (!globalState.managerProcess) return toast.error("Manager process not found");
+    //     if (!globalState.managerProcess) return toast.error("Manager process not found");
 
-        const query = `local res = db:exec[[
-            DELETE FROM Deployments
-            WHERE Name = '${projName}'
-        ]]`;
-        console.log(query);
+    //     const query = `local res = db:exec[[
+    //         DELETE FROM Deployments
+    //         WHERE Name = '${projName}'
+    //     ]]`;
+    //     console.log(query);
 
-        const res = await runLua(query, globalState.managerProcess);
-        if (res.Error) return toast.error(res.Error);
-        console.log(res);
-        await refresh();
+    //     const res = await runLua(query, globalState.managerProcess);
+    //     if (res.Error) return toast.error(res.Error);
+    //     console.log(res);
+    //     await refresh();
 
-        toast.success("Deployment deleted successfully");
-        router.push("/dashboard");
+    //     toast.success("Deployment deleted successfully");
+    //     router.push("/dashboard");
 
-    }
+    // }
 
     return (
         <Layout>
@@ -160,10 +169,6 @@ export default function Deploy() {
 
                 <Button disabled={deploying} className="my-10" onClick={deploy}>
                     Deploy <Loader className={deploying ? "animate-spin" : "hidden"} />
-                </Button>
-
-                <Button disabled={deploying} className="my-10" onClick={deleteDeployment}>
-                    Delete Deployment
                 </Button>
 
                 {
