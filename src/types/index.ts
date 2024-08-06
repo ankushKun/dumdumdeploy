@@ -5,6 +5,9 @@ export type TDeployment = {
     InstallCMD: string,
     BuildCMD: string,
     OutputDIR: string,
+    ArnsProcess: string,
+    DeploymentId: string,
+    DeploymentHash: string
 }
 
 export type TDeployments = {

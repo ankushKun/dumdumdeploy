@@ -44,6 +44,7 @@ export default function useDeploymentManager() {
     const globalState = useGlobalState();
     const { connected } = useConnection();
     const address = useActiveAddress();
+    const ao = connect()
 
     useEffect(() => {
         if (connected && address) {

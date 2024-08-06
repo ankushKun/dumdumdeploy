@@ -11,27 +11,30 @@ import Arweave from "arweave"
 import { Loader } from "lucide-react";
 import useDeploymentManager from "@/hooks/useDeploymentManager";
 import axios from "axios"
-// import Ansi from "ansi-to-react"
+import Ansi from "ansi-to-react"
+import { connect, createDataItemSigner } from "@permaweb/aoconnect";
+import { BUILDER_BACKEND } from "@/lib/utils";
 
-function Logs({ name }: { name: string }) {
+function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
     console.log(name)
     const [output, setOutput] = useState("")
 
     useEffect(() => {
+        if (!name) return
         const internval = setInterval(async () => {
-            const logs = await axios.get("http://localhost:3001/logs/" + name)
+            if (!deploying) return clearInterval(internval)
+            const logs = await axios.get(`${BUILDER_BACKEND}/logs/${name}`)
             console.log(logs.data)
-            setOutput((logs.data as string).replaceAll("[1G[0K", "").replaceAll("\\|/-", ""))
+            setOutput((logs.data as string).replaceAll(/\\|\||\-/g, ""))
         }, 1000)
 
         return () => { clearInterval(internval) }
-    }, [])
+    }, [name, deploying])
 
     return <div>
         <div className="pl-2 mb-1">Build Logs</div>
-        <pre className="font-mono text-xs border p-2 rounded-lg px-4 bg-black/30 overflow-scroll">
-            {/* <Ansi>{output}</Ansi> */}
-            {output}
+        <pre className="font-mono text-xs border p-2 rounded-lg px-4 bg-black/30 overflow-scroll max-h-[250px]">
+            <Ansi className="!font-mono">{output}</Ansi>
         </pre>
     </div>
 }
@@ -88,7 +91,7 @@ export default function Deploy() {
 
         // call backend -> deploy -> get txid
 
-        const txid = await axios.post("http://localhost:3001/deploy", {
+        const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
             repository: repoUrl,
             installCommand,
             buildCommand,
@@ -96,23 +99,47 @@ export default function Deploy() {
         })
 
         if (txid.status == 200) {
+            console.log("https://arweave.net/" + txid.data)
             toast.success("Deployment successful")
+
+            // const mres = await connect().message({
+            //     process: arnsProcess,
+            //     tags: [
+            //         { name: "Action", value: "Set-Record" },
+            //         { name: "Sub-Domain", value: "@" },
+            //         { name: "Transaction-Id", value: txid.data },
+            //         { name: "TTL-Seconds", value: "3600" },
+            //     ],
+            //     signer: createDataItemSigner(window.arweaveWallet),
+            // })
+
+            const mres = await runLua("", arnsProcess, [
+                { name: "Action", value: "Set-Record" },
+                { name: "Sub-Domain", value: "@" },
+                { name: "Transaction-Id", value: txid.data },
+                { name: "TTL-Seconds", value: "3600" },
+            ])
+            console.log("set arns name", mres)
+
+            const updres = await runLua(`db:exec[[UPDATE Deployments SET DeploymentId='${txid.data}' WHERE Name='${projName}']]`, globalState.managerProcess)
+
+            router.push("/deployments/" + projName);
+            window.open("https://arweave.net/" + txid.data, "_blank")
+
+
         } else {
             toast.error("Deployment failed")
             console.log(txid)
         }
 
-
-
         setDeploying(false);
-        router.push("/deployments/" + projName);
     }
 
     return (
         <Layout>
             <div className="text-xl my-5 mb-10">Create New Deployment</div>
 
-            <div className="md:min-w-[40%] w-full max-w-lg mx-auto flex flex-col gap-2">
+            <div className="md:min-w-[60%] w-full max-w-lg mx-auto flex flex-col gap-2">
                 <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="project-name">Project Name</label>
                 <Input placeholder="e.g. Coolest AO App" id="project-name" required onChange={(e) => setProjName(e.target.value)} />
 
@@ -168,7 +195,7 @@ export default function Deploy() {
                 </Button>
 
                 {
-                    <Logs name={`${repoUrl}`.replace(/\.git|\/$/, '').split('/').pop() as string} />
+                    <Logs name={`${repoUrl}`.replace(/\.git|\/$/, '').split('/').pop() as string} deploying={deploying} />
                 }
             </div>
         </Layout>

@@ -6,6 +6,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export const BUILDER_BACKEND = "http://localhost:3001"
+export const DEPLOYMENT_WALLET = "CUO_Jtx-J9Ph4NVKY_Bgii4HSUwK3NbdaIlPDSiy8Cs"
+
 export async function getManagerProcessFromAddress(address: string) {
   const client = new GraphQLClient("https://arweave.net/graphql")
 
