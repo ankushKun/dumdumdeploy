@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+<<<<<<< HEAD
+=======
+      '@irys/arweave':
+        specifier: 0.0.2
+        version: 0.0.2
+>>>>>>> b9ec6a65c1731ed10d3ccd1d48208f9406ff3d11
       '@permaweb/aoconnect':
         specifier: ^0.0.57
         version: 0.0.57
@@ -1214,6 +1220,12 @@ packages:
   ast-types-flow@0.0.8:
     resolution: {integrity: sha512-OH/2E5Fg20h2aPrbe+QL8JZQFko0YZaF+j4mnQ7BGhfavO7OpSLa8a0y9sBwomHdSbkhTS8TQNayBfnW5DwbvQ==}
 
+<<<<<<< HEAD
+=======
+  async-retry@1.3.3:
+    resolution: {integrity: sha512-wfr/jstw9xNi/0teMHrRW7dsz3Lt5ARhYNZ2ewpadnhaIp5mbALhOAP+EAdsC7t4Z6wqsDVv9+W6gm1Dk9mEyw==}
+
+>>>>>>> b9ec6a65c1731ed10d3ccd1d48208f9406ff3d11
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
@@ -4334,6 +4346,13 @@ snapshots:
 
   ast-types-flow@0.0.8: {}
 
+<<<<<<< HEAD
+=======
+  async-retry@1.3.3:
+    dependencies:
+      retry: 0.13.1
+
+>>>>>>> b9ec6a65c1731ed10d3ccd1d48208f9406ff3d11
   asynckit@0.4.0: {}
 
   available-typed-arrays@1.0.7:
