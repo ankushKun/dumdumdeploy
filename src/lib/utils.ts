@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const BUILDER_BACKEND = "http://37.60.238.86:3001"
+export const BUILDER_BACKEND = "https://dumdum.betteridea.dev"
 export const DEPLOYMENT_WALLET = "CUO_Jtx-J9Ph4NVKY_Bgii4HSUwK3NbdaIlPDSiy8Cs"
 
 export async function getManagerProcessFromAddress(address: string) {
