@@ -1,0 +1,6 @@
+wallet.json
+_wallet.json
+.env
+builds/*
+!builds/.gitkeep
+node_modules
