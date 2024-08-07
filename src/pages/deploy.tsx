@@ -92,7 +92,7 @@ export default function Deploy() {
                 installCommand,
                 buildCommand,
                 outputDir,
-            }, { timeout: 30 * 60 * 1000, headers: { "Content-Type": "application/json" } });
+            }, { timeout: 60 * 60 * 1000, headers: { "Content-Type": "application/json" } });
 
             if (txid.status === 200) {
                 console.log("https://arweave.net/" + txid.data);
