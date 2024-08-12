@@ -48,12 +48,13 @@ app.get('/', (req, res) => {
 
 app.post('/deploy', async (req, res) => {
     console.log('Request:', req.body);
-    const { repository, installCommand, buildCommand, outputDir } = req.body;
+    const { repository, installCommand, buildCommand, outputDir, branch } = req.body;
 
     if (!repository) return res.status(400).send('Repository is required');
     if (!installCommand) return res.status(400).send('Install Command is required');
     if (!buildCommand) return res.status(400).send('Build Command is required');
     if (!outputDir) return res.status(400).send('Output Directory is required');
+    if (!branch) return res.status(400).send('Branch is required');
 
     // remove trailing .git and / from repository url
     const folderName = `${repository}`.replace(/\.git|\/$/, '').split('/').pop();
@@ -96,7 +97,7 @@ app.post('/deploy', async (req, res) => {
     var containerCommand = `cd /home/node;
     rm -rf /home/node/${folderName}/${outputDir};
     echo "" > /home/node/${folderName}/log.txt;
-    git clone ${repository} ${folderName};
+    git clone -b ${branch} ${repository} ${folderName};
     cd /home/node/${folderName};
     ${installCommand};
     ${buildCommand};
