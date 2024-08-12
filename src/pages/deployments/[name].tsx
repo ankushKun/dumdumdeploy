@@ -51,7 +51,7 @@ export default function Deployment() {
         const buildCommand = deployment.BuildCMD;
         const outputDir = deployment.OutputDIR;
         const arnsProcess = deployment.ArnsProcess;
-
+        const branch = deployment.Branch || "main";
         setRedeploying(true);
         setBuildOutput("");
         try {
@@ -155,6 +155,11 @@ export default function Deployment() {
                 <Card className=" h-fit p-0">
                     <div className="text-muted-foreground">Build Command</div>
                     {deployment.BuildCMD}</Card>
+                <Card className=" h-fit p-0">
+                    <div className="text-muted-foreground">
+                        Active Branch
+                    </div>
+                    {deployment.Branch}</Card>
                 <Card className=" h-fit p-0">
                     <div className="text-muted-foreground">Output Directory</div>
                     {deployment.OutputDIR}</Card>

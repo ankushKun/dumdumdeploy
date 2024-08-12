@@ -8,30 +8,30 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Arweave from "arweave";
 import { Loader } from "lucide-react";
-import useDeploymentManager from "@/hooks/useDeploymentManager";
 import axios from "axios";
 import Ansi from "ansi-to-react";
 import { BUILDER_BACKEND } from "@/lib/utils";
+import useDeploymentManager from "@/hooks/useDeploymentManager";
 
 function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
-    console.log(name)
-    const [output, setOutput] = useState("")
+    console.log(name);
+    const [output, setOutput] = useState("");
 
     useEffect(() => {
-        if (!name) return
+        if (!name) return;
         const interval = setInterval(async () => {
-            if (!deploying) return clearInterval(interval)
-            const logs = await axios.get(`${BUILDER_BACKEND}/logs/${name}`)
-            console.log(logs.data)
-            setOutput((logs.data as string).replaceAll(/\\|\||\-/g, ""))
+            if (!deploying) return clearInterval(interval);
+            const logs = await axios.get(`${BUILDER_BACKEND}/logs/${name}`);
+            console.log(logs.data);
+            setOutput((logs.data as string).replaceAll(/\\|\||\-/g, ""));
             setTimeout(() => {
                 const logsDiv = document.getElementById("logs");
                 logsDiv?.scrollTo({ top: logsDiv.scrollHeight, behavior: "smooth" });
-            }, 100)
-        }, 1000)
+            }, 100);
+        }, 1000);
 
-        return () => { clearInterval(interval) }
-    }, [name, deploying])
+        return () => { clearInterval(interval); }
+    }, [name, deploying]);
 
     return (
         <div>
@@ -40,7 +40,7 @@ function Logs({ name, deploying }: { name: string, deploying?: boolean }) {
                 <Ansi className="!font-mono">{output}</Ansi>
             </pre>
         </div>
-    )
+    );
 }
 
 export default function Deploy() {
@@ -54,6 +54,10 @@ export default function Deploy() {
     const [outputDir, setOutputDir] = useState("./dist");
     const [deploying, setDeploying] = useState(false);
     const [arnsProcess, setArnsProcess] = useState("");
+    const [selectedBranch, setSelectedBranch] = useState("");
+    const [branches, setBranches] = useState([]);
+    const [loadingBranches, setLoadingBranches] = useState(false);
+    const [branchError, setBranchError] = useState("");
 
     const arweave = Arweave.init({
         host: "arweave.net",
@@ -61,9 +65,34 @@ export default function Deploy() {
         protocol: "https",
     });
 
+    async function fetchBranches() {
+        if (!repoUrl) return;
+        const [owner, repo] = repoUrl.replace("https://github.com/", "").split("/");
+        setLoadingBranches(true);
+        setBranchError("");
+
+        try {
+            const response = await axios.get(
+                `https://api.github.com/repos/${owner}/${repo}/branches`,
+
+            );
+            setBranches(response.data.map((branch: any) => branch.name));
+        } catch (error) {
+            setBranchError("Failed to fetch branches");
+            console.error(error);
+        } finally {
+            setLoadingBranches(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchBranches();
+    }, [repoUrl]);
+
     async function deploy() {
         if (!projName) return toast.error("Project Name is required");
         if (!repoUrl) return toast.error("Repository Url is required");
+        if (!selectedBranch) return toast.error("Branch is required");
         if (!installCommand) return toast.error("Install Command is required");
         if (!buildCommand) return toast.error("Build Command is required");
         if (!outputDir) return toast.error("Output Directory is required");
@@ -75,9 +104,9 @@ export default function Deploy() {
 
         setDeploying(true);
         const query = `local res = db:exec[[
-            INSERT INTO Deployments (Name, RepoUrl, InstallCMD, BuildCMD, OutputDIR, ArnsProcess)
+            INSERT INTO Deployments (Name, RepoUrl, Branch, InstallCMD, BuildCMD, OutputDIR, ArnsProcess)
                 VALUES
-            ('${projName}', '${repoUrl}', '${installCommand}', '${buildCommand}', '${outputDir}', '${arnsProcess}')
+            ('${projName}', '${repoUrl}', '${selectedBranch}', '${installCommand}', '${buildCommand}', '${outputDir}', '${arnsProcess}')
         ]]`;
         console.log(query);
 
@@ -89,6 +118,7 @@ export default function Deploy() {
         try {
             const txid = await axios.post(`${BUILDER_BACKEND}/deploy`, {
                 repository: repoUrl,
+                branch: selectedBranch, 
                 installCommand,
                 buildCommand,
                 outputDir,
@@ -123,27 +153,6 @@ export default function Deploy() {
         setDeploying(false);
     }
 
-    // async function deleteDeployment() {
-    //     if (!projName) return toast.error("Project Name is required");
-
-    //     if (!globalState.managerProcess) return toast.error("Manager process not found");
-
-    //     const query = `local res = db:exec[[
-    //         DELETE FROM Deployments
-    //         WHERE Name = '${projName}'
-    //     ]]`;
-    //     console.log(query);
-
-    //     const res = await runLua(query, globalState.managerProcess);
-    //     if (res.Error) return toast.error(res.Error);
-    //     console.log(res);
-    //     await refresh();
-
-    //     toast.success("Deployment deleted successfully");
-    //     router.push("/dashboard");
-
-    // }
-
     return (
         <Layout>
             <div className="text-xl my-5 mb-10">Create New Deployment</div>
@@ -155,6 +164,22 @@ export default function Deploy() {
                 <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="repo-url">Repository Url</label>
                 <Input placeholder="e.g. github.com/weeblet/super-cool-app" id="repo-url" required onChange={(e) => setRepoUrl(e.target.value)} />
 
+                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="branch">Branch</label>
+                <select
+                    className="border rounded-md p-2"
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    disabled={!repoUrl || loadingBranches}
+                >
+                    <option value="" disabled>Select a branch</option>
+                    {branches.map((branch: any) => (
+                        <option key={branch} value={branch}>
+                            {branch}
+                        </option>
+                    ))}
+                </select>
+                {branchError && <div className="text-red-500">{branchError}</div>}
+
                 <label className="text-muted-foreground pl-2 pt-10 -mb-1" htmlFor="install-command">Install Command</label>
                 <Input placeholder="e.g. npm ci" id="install-command" onChange={(e) => setInstallCommand(e.target.value || "npm ci")} />
 
@@ -164,16 +189,14 @@ export default function Deploy() {
                 <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="output-dir">Output Directory</label>
                 <Input placeholder="e.g. ./dist" id="output-dir" onChange={(e) => setOutputDir(e.target.value || "./dist")} />
 
-                <label className="text-muted-foreground pl-2 pt-10 -mb-1" htmlFor="arns-process">ArNS Process ID (get this from arns.app)</label>
-                <Input placeholder="e.g. ./dist" id="arns-process" onChange={(e) => setArnsProcess(e.target.value)} />
+                <label className="text-muted-foreground pl-2 pt-2 -mb-1" htmlFor="arns-process">ArNS Process ID</label>
+                <Input placeholder="e.g. arns.id" id="arns-process" onChange={(e) => setArnsProcess(e.target.value)} />
 
-                <Button disabled={deploying} className="my-10" onClick={deploy}>
-                    Deploy <Loader className={deploying ? "animate-spin" : "hidden"} />
+                <Button className="w-full mt-10" variant="secondary" onClick={deploy}>
+                    {deploying ? <Loader className="animate-spin mr-2" /> : "Deploy"}
                 </Button>
 
-                {
-                    <Logs name={`${repoUrl}`.replace(/\.git|\/$/, '').split('/').pop() as string} deploying={deploying} />
-                }
+                {deploying && <Logs name={projName} deploying={deploying} />}
             </div>
         </Layout>
     );

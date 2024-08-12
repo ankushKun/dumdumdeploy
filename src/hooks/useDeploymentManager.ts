@@ -16,6 +16,7 @@ db:exec[[
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         Name TEXT NOT NULL,
         RepoUrl TEXT NOT NULL,
+        Branch TEXT DEFAULT 'main',
         InstallCMD TEXT DEFAULT 'npm ci',
         BuildCMD TEXT DEFAULT 'npm run build',
         OutputDIR TEXT DEFAULT './dist',

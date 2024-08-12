@@ -3,6 +3,7 @@ export type TDeployment = {
     Name: string,
     RepoUrl: string,
     InstallCMD: string,
+    Branch: string,
     BuildCMD: string,
     OutputDIR: string,
     ArnsProcess: string,
